@@ -1,6 +1,7 @@
 package com.caitlykate.customview
 
 import android.content.Context
+import android.content.res.TypedArray
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
@@ -8,101 +9,121 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import androidx.annotation.ColorRes
+import androidx.core.content.ContextCompat
 import kotlin.properties.Delegates
 
-class CometTouchView(
+class CometTouchView @JvmOverloads constructor(
     context: Context,
-    attributesSet: AttributeSet?,
-    defStyleAttr: Int,
-    defStyleRes: Int,
-) : View(context, attributesSet, defStyleAttr, defStyleRes), View.OnTouchListener {
+    attributesSet: AttributeSet? = null,
+    defStyleAttr: Int = R.attr.CometTouchViewStyle,
+    defStyleRes: Int = R.style.DefaultCometViewStyle,
+) : View(context, attributesSet, defStyleAttr, defStyleRes) {
 
-    private var cometColor by Delegates.notNull<Int>()
+    companion object {
+        private const val COMET_DEFAULT_COLOR = R.color.light_gray
+    }
 
-    val COMET_DEFAULT_COLOR = Color.argb(127, 255, 0, 0)
+    private val cometColor: Int
 
     // координаты для рисования круга
-    var x : Float? = 0f
-    var y : Float? = 0f
+    private var x: Float? = 0f
+    private var y: Float? = 0f
 
     // движение пальца
-    var isActionMove = false
+    private var isActionMove: Boolean = false
 
-    private val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = COMET_DEFAULT_COLOR
-        maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
+    private val circlePaint: Paint by lazy(LazyThreadSafetyMode.NONE) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = getCompatColor(colorRes = COMET_DEFAULT_COLOR)
+            maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
 
+        }
     }
-    private val shadowPaint = Paint(0).apply {
-        style = Paint.Style.FILL
-        color = 0x101010
-        maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
-    }
-
-    constructor(context: Context, attributesSet: AttributeSet?, defStyleAttr: Int
-    ) : this(context, attributesSet, defStyleAttr,  R.style.DefaultCometViewStyle)
-    constructor(context: Context, attributesSet: AttributeSet?) : this(context, attributesSet, R.attr.CometTouchViewStyle)
-    constructor(context: Context) : this(context, null)
 
     init {
         if (attributesSet != null) {
             initAttributes(attributesSet, defStyleAttr, defStyleRes)
+            val typedArray =
+            cometColor =
         } else {
-            initDefaultColor()
+            cometColor = getCompatColor(colorRes = COMET_DEFAULT_COLOR)
         }
     }
 
-    private fun initAttributes(attributesSet: AttributeSet?, defStyleAttr: Int, defStyleRes: Int) {
-        val typedArray = context.obtainStyledAttributes(attributesSet, R.styleable.CometTouchView, defStyleAttr, defStyleRes)
+    private fun getTypedArray(
+        context: Context,
+        attributesSet: AttributeSet,
+        defStyleAttr: Int,
+        defStyleRes: Int,
+    ): TypedArray {
+        return context.obtainStyledAttributes(
+            attributesSet,
+            R.styleable.CometTouchView,
+            defStyleAttr,
+            defStyleRes
+        )
+    }
 
-        cometColor = typedArray.getColor(R.styleable.CometTouchView_cometColor, COMET_DEFAULT_COLOR)
+    private fun getDefaultCometColor(
+        context: Context,
+        typedArray: TypedArray,
+    ): Int {
+        return typedArray.getColor(
+            R.styleable.CometTouchView_cometColor,
+            getCompatColor(colorRes = COMET_DEFAULT_COLOR)
+        )
+    }
+
+    private fun initAttributes(attributesSet: AttributeSet?, defStyleAttr: Int, defStyleRes: Int) {
+        val typedArray = context.obtainStyledAttributes(
+            attributesSet,
+            R.styleable.CometTouchView,
+            defStyleAttr,
+            defStyleRes
+        )
+
+        cometColor = typedArray.getColor(
+            R.styleable.CometTouchView_cometColor,
+            getCompatColor(colorRes = COMET_DEFAULT_COLOR)
+        )
 
         typedArray.recycle()
     }
 
-    private fun initDefaultColor(){
-        cometColor = COMET_DEFAULT_COLOR
-    }
-
-    override fun onDraw(canvas: Canvas?) {
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas?.drawCircle(x!!, y!!, 50f, circlePaint)
+        if (isActionMove) {
+            canvas.drawCircle(x!!, y!!, 50f, circlePaint)
+        }
     }
 
-    override fun onTouch(v: View?, event: MotionEvent?): Boolean {
-        // координаты Touch-события
-        var xEv = event?.x
-        var yEv = event?.y
-
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
         when (event?.action) {
-            MotionEvent.ACTION_DOWN -> {// нажатие
-                // включаем режим перетаскивания
+            MotionEvent.ACTION_MOVE,
+            MotionEvent.ACTION_DOWN -> {
                 isActionMove = true
+                x = event.x
+                y = event.y
+                invalidate()
+                return true
             }
-            MotionEvent.ACTION_MOVE -> {// движение
-                // если режим перетаскивания включен
-                if (isActionMove) {
-                    // определеяем новые координаты для рисования
-                    x = xEv!!
-                    y = yEv!!
-                    // перерисовываем экран
-                    invalidate()
-                }
-            }
-            MotionEvent.ACTION_UP -> {// отпускание
-                // выключаем режим перетаскивания
-                isActionMove = false
-            }
+            MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL -> {
-                // выключаем режим перетаскивания
                 isActionMove = false
+                invalidate()
+                return true
             }
         }
-        return true;
+        return true
     }
+}
 
-    companion object{
-        //const val COMET_DEFAULT_COLOR = Color.
-    }
+fun Context.getCompatColor(@ColorRes colorRes: Int): Int {
+    return ContextCompat.getColor(this, colorRes)
+}
+
+fun View.getCompatColor(@ColorRes colorRes: Int): Int {
+    return context.getCompatColor(colorRes = colorRes)
 }
