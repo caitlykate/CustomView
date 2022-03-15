@@ -1,17 +1,17 @@
 package com.caitlykate.customview
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.TypedArray
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Point
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.annotation.ColorRes
 import androidx.core.content.ContextCompat
-import kotlin.properties.Delegates
+import java.util.*
 
 class CometTouchView @JvmOverloads constructor(
     context: Context,
@@ -26,92 +26,66 @@ class CometTouchView @JvmOverloads constructor(
 
     private val cometColor: Int
 
-    // координаты для рисования круга
-    private var x: Float? = 0f
-    private var y: Float? = 0f
+    //координаты следа пальца
+    private val pointsLinkedList = LinkedList<Point>()
 
-    // движение пальца
-    private var isActionMove: Boolean = false
+    init {
+        val typedArray = attributesSet?.let { attrSet ->
+            context.obtainStyledAttributes(
+                attrSet,
+                R.styleable.CometTouchView,
+                defStyleAttr,
+                defStyleRes
+            )
+        }
+
+        cometColor = typedArray?.getColor(
+            R.styleable.CometTouchView_cometColor,
+            getCompatColor(colorRes = COMET_DEFAULT_COLOR)
+        ) ?: getCompatColor(colorRes = COMET_DEFAULT_COLOR)
+
+        typedArray?.recycle()
+    }
 
     private val circlePaint: Paint by lazy(LazyThreadSafetyMode.NONE) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-            color = getCompatColor(colorRes = COMET_DEFAULT_COLOR)
+            color = cometColor
             maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
 
         }
     }
 
-    init {
-        if (attributesSet != null) {
-            initAttributes(attributesSet, defStyleAttr, defStyleRes)
-            val typedArray =
-            cometColor =
-        } else {
-            cometColor = getCompatColor(colorRes = COMET_DEFAULT_COLOR)
-        }
-    }
-
-    private fun getTypedArray(
-        context: Context,
-        attributesSet: AttributeSet,
-        defStyleAttr: Int,
-        defStyleRes: Int,
-    ): TypedArray {
-        return context.obtainStyledAttributes(
-            attributesSet,
-            R.styleable.CometTouchView,
-            defStyleAttr,
-            defStyleRes
-        )
-    }
-
-    private fun getDefaultCometColor(
-        context: Context,
-        typedArray: TypedArray,
-    ): Int {
-        return typedArray.getColor(
-            R.styleable.CometTouchView_cometColor,
-            getCompatColor(colorRes = COMET_DEFAULT_COLOR)
-        )
-    }
-
-    private fun initAttributes(attributesSet: AttributeSet?, defStyleAttr: Int, defStyleRes: Int) {
-        val typedArray = context.obtainStyledAttributes(
-            attributesSet,
-            R.styleable.CometTouchView,
-            defStyleAttr,
-            defStyleRes
-        )
-
-        cometColor = typedArray.getColor(
-            R.styleable.CometTouchView_cometColor,
-            getCompatColor(colorRes = COMET_DEFAULT_COLOR)
-        )
-
-        typedArray.recycle()
-    }
-
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (isActionMove) {
-            canvas.drawCircle(x!!, y!!, 50f, circlePaint)
+
+        pointsLinkedList.forEachIndexed { index, point ->
+            canvas.drawCircle(
+                point.x.toFloat(),
+                point.y.toFloat(),
+                (index + 1).toFloat(),
+                circlePaint,
+            )
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         when (event?.action) {
             MotionEvent.ACTION_MOVE,
             MotionEvent.ACTION_DOWN -> {
-                isActionMove = true
-                x = event.x
-                y = event.y
+                pointsLinkedList.add(Point(event.x.toInt(), event.y.toInt()))
+
+                if (pointsLinkedList.size > 50) {
+                    pointsLinkedList.removeFirst()
+                }
+
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL -> {
-                isActionMove = false
+                pointsLinkedList.clear()
                 invalidate()
                 return true
             }

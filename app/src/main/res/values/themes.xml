@@ -20,7 +20,7 @@
     </style>
 
     <style name="GlobalCometViewStyle">
-        <item name="cometColor">#878787</item>
+        <item name="cometColor">#EAB9B9</item>
     </style>
 
 </resources>
